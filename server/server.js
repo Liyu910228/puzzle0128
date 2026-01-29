@@ -275,12 +275,22 @@ app.post('/upload', upload.single('image'), (req, res) => {
 
 // 获取服务器地址（支持云平台和局域网）
 function getLocalIP() {
-  // 如果设置了 PUBLIC_URL 环境变量（云平台），直接使用
+  // 1. 优先使用手动设置的 PUBLIC_URL
   if (process.env.PUBLIC_URL) {
     return process.env.PUBLIC_URL.replace(/^https?:\/\//, '').replace(/\/$/, '');
   }
 
-  // 否则获取本机局域网IP
+  // 2. Railway 自动提供的域名
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    return process.env.RAILWAY_PUBLIC_DOMAIN;
+  }
+
+  // 3. Render 提供的域名
+  if (process.env.RENDER_SERVICE_URL) {
+    return process.env.RENDER_SERVICE_URL.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  }
+
+  // 4. 否则获取本机局域网IP
   const interfaces = require('os').networkInterfaces();
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name]) {
@@ -296,6 +306,10 @@ function getLocalIP() {
 function getProtocol() {
   if (process.env.PUBLIC_URL) {
     return process.env.PUBLIC_URL.startsWith('https') ? 'https' : 'http';
+  }
+  // Railway 和 Render 都是 https
+  if (process.env.RAILWAY_PUBLIC_DOMAIN || process.env.RENDER_SERVICE_URL) {
+    return 'https';
   }
   return 'http';
 }
