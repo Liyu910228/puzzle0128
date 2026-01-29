@@ -260,7 +260,9 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
-    if (gameState.players.has(playerId)) {
+    // 只有在游戏未完成时才删除玩家
+    // 游戏完成后保留玩家信息在排行榜中，方便查看成绩
+    if (gameState.players.has(playerId) && gameState.status !== 'finished') {
       gameState.players.delete(playerId);
       broadcastLeaderboard();
     }
