@@ -366,6 +366,7 @@
         let playerId = null;
         let playerName = null;
         let puzzle = [];
+        let gridSize = 3; // 默认 3x3
         let imageUrl = null;
         let moves = 0;
         let startTime = null;
@@ -412,7 +413,8 @@
                     playerId = data.playerId;
                     playerName = data.playerName;
                     imageUrl = data.imageUrl;
-                    puzzle = data.puzzle || [0, 0, 0, 0, 0, 0, 0, 0, 0]; // 旋转角度数组
+                    gridSize = data.gridSize || 3;
+                    puzzle = data.puzzle || Array(gridSize * gridSize).fill(0);
                     playerNameEl.textContent = playerName;
                     updateGameStatus(data.gameStatus);
                     break;
@@ -424,11 +426,13 @@
                     break;
 
                 case 'puzzleUpdate':
+                    if (data.gridSize) gridSize = data.gridSize;
                     puzzle = data.puzzle;
                     renderPuzzle();
                     break;
 
                 case 'gameStart':
+                    if (data.gridSize) gridSize = data.gridSize;
                     startGame();
                     break;
 
@@ -512,20 +516,26 @@
         function renderPuzzle() {
             if (!imageUrl) return;
 
+            // 更新网格列数
+            puzzleBoard.style.gridTemplateColumns = 'repeat(' + gridSize + ', 1fr)';
+
             puzzleBoard.innerHTML = '';
 
             puzzle.forEach(function(rotation, index) {
                 const tileEl = document.createElement('div');
                 tileEl.className = 'puzzle-tile';
 
-                // 计算这个位置对应的图片区域 (0-8 对应 3x3 网格)
-                const row = Math.floor(index / 3);
-                const col = index % 3;
+                // 计算这个位置对应的图片区域
+                const row = Math.floor(index / gridSize);
+                const col = index % gridSize;
 
                 const inner = document.createElement('div');
                 inner.className = 'puzzle-tile-inner';
                 inner.style.backgroundImage = 'url(' + imageUrl + ')';
-                inner.style.backgroundPosition = (col * 50) + '% ' + (row * 50) + '%';
+                // 计算背景位置百分比
+                const percent = 100 / (gridSize - 1);
+                inner.style.backgroundPosition = (col * percent) + '% ' + (row * percent) + '%';
+                inner.style.backgroundSize = (gridSize * 100) + '%';
                 inner.style.transform = 'rotate(' + (rotation * 90) + 'deg)';
 
                 tileEl.appendChild(inner);
