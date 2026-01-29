@@ -27,7 +27,7 @@ const gameState = {
   image: null,
   imageUrl: null,
   players: new Map(), // playerId -> { id, name, status, time, steps, startTime, finishTime }
-  correctRotation: [0, 0, 0, 0, 0, 0, 0, 0, 0], // 每个格子的正确旋转角度 (0度)
+  gridSize: 3, // 网格大小: 3=3x3, 4=4x4, 5=5x5
   gameStartTime: null
 };
 
@@ -42,17 +42,23 @@ function generateRandomName() {
 }
 
 // 打乱拼图 - 为每个格子生成随机旋转角度 (0-3, 代表 0度/90度/180度/270度)
-function shufflePuzzle() {
+function shufflePuzzle(size) {
+  const tileCount = size * size;
   const rotations = [];
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < tileCount; i++) {
     // 随机旋转 0-3 次 (0度/90度/180度/270度)
     rotations.push(Math.floor(Math.random() * 4));
   }
   // 确保至少有一个格子是旋转过的，避免一开始就是完成状态
   if (rotations.every(r => r === 0)) {
-    rotations[Math.floor(Math.random() * 9)] = 1;
+    rotations[Math.floor(Math.random() * tileCount)] = 1;
   }
   return rotations;
+}
+
+// 获取正确的旋转数组（全部为0）
+function getCorrectRotation(size) {
+  return Array(size * size).fill(0);
 }
 
 function arraysEqual(a, b) {
@@ -125,7 +131,7 @@ wss.on('connection', (ws, req) => {
       steps: 0,
       startTime: null,
       finishTime: null,
-      puzzle: shufflePuzzle()
+      puzzle: shufflePuzzle(gameState.gridSize)
     });
 
     ws.send(JSON.stringify({
@@ -133,6 +139,7 @@ wss.on('connection', (ws, req) => {
       playerId,
       playerName,
       imageUrl: gameState.imageUrl,
+      gridSize: gameState.gridSize,
       puzzle: gameState.players.get(playerId).puzzle,
       gameStatus: gameState.status
     }));
@@ -156,6 +163,9 @@ wss.on('connection', (ws, req) => {
 
       case 'startGame':
         if (gameState.imageUrl) {
+          // 获取难度参数（3=3x3, 4=4x4, 5=5x5）
+          const size = data.gridSize || 3;
+          gameState.gridSize = size;
           gameState.status = 'playing';
           gameState.gameStartTime = Date.now();
 
@@ -166,11 +176,12 @@ wss.on('connection', (ws, req) => {
             player.time = 0;
             player.steps = 0;
             player.finishTime = null;
-            player.puzzle = shufflePuzzle();
+            player.puzzle = shufflePuzzle(size);
           });
 
           broadcast({
             type: 'gameStart',
+            gridSize: size,
             startTime: gameState.gameStartTime
           });
 
@@ -178,6 +189,7 @@ wss.on('connection', (ws, req) => {
           gameState.players.forEach(player => {
             sendToPlayer(player.id, {
               type: 'puzzleUpdate',
+              gridSize: size,
               puzzle: player.puzzle
             });
           });
@@ -189,7 +201,7 @@ wss.on('connection', (ws, req) => {
       case 'rotate':
         const player = gameState.players.get(data.playerId);
         if (player && player.status === 'playing') {
-          const tileIndex = data.tileIndex; // 0-8, 代表九宫格中的位置
+          const tileIndex = data.tileIndex; // 格子索引
           const puzzle = player.puzzle;
 
           // 顺时针旋转90度 (0->1->2->3->0)
@@ -197,7 +209,8 @@ wss.on('connection', (ws, req) => {
           player.steps++;
 
           // 检查是否完成 (所有格子都是0度)
-          if (arraysEqual(puzzle, gameState.correctRotation)) {
+          const correctRotation = getCorrectRotation(gameState.gridSize);
+          if (arraysEqual(puzzle, correctRotation)) {
             player.status = 'finished';
             player.finishTime = Date.now();
             player.time = player.finishTime - player.startTime;
@@ -229,6 +242,7 @@ wss.on('connection', (ws, req) => {
         gameState.image = null;
         gameState.imageUrl = null;
         gameState.players.clear();
+        gameState.gridSize = 3;
         gameState.gameStartTime = null;
 
         // 清理上传的图片
