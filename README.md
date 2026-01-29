@@ -6,10 +6,12 @@
 
 - 管理员上传图片，生成二维码供玩家扫码加入
 - 玩家自动生成随机唯一名称
-- 九宫格旋转拼图（3x3），点击小块顺时针旋转90度
+- **多难度选择**：3x3（简单）、4x4（中等）、5x5（困难）
+- 点击小块顺时针旋转90度
 - 实时计时和步数统计
 - 实时排行榜，金银铜牌显示
-- 完成后有庆祝动画效果
+- 完成后有庆祝动画效果（彩带效果）
+- **动态公网地址支持**：自动适配云平台环境变量
 
 ## 技术栈
 
@@ -153,6 +155,114 @@ docker run -d -p 3000:3000 --name puzzle-game puzzle-game
 
 ### 方式四：云平台部署（推荐，跨网络访问）
 
+#### 部署到腾讯云服务器（推荐）
+
+适合已有腾讯云服务器的用户，支持公网访问。
+
+**前提条件：**
+- 腾讯云服务器（Ubuntu/Debian 或 CentOS）
+- 服务器公网 IP
+
+**部署步骤：**
+
+**第一步：安装 Node.js**
+
+```bash
+# Ubuntu/Debian 系统
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# 验证安装
+node -v
+npm -v
+```
+
+**第二步：安装 Git 和 PM2**
+
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install -y git
+
+# 安装 PM2（进程管理器，支持后台运行和自动重启）
+sudo npm install -g pm2
+```
+
+**第三步：克隆项目**
+
+```bash
+cd ~
+git clone https://github.com/Pengyaofeng/puzzle0128.git
+cd puzzle0128
+```
+
+**第四步：配置环境变量**
+
+```bash
+# 创建 .env 文件（替换成你的实际公网 IP）
+cat > .env << EOF
+PORT=3000
+NODE_ENV=production
+PUBLIC_URL=http://你的公网IP:3000
+EOF
+```
+
+> **注意**：如果有域名，将 `PUBLIC_URL` 改为 `https://你的域名`
+
+**第五步：安装依赖**
+
+```bash
+npm install
+```
+
+**第六步：启动服务**
+
+```bash
+# 使用 PM2 启动（支持后台运行和自动重启）
+pm2 start server/server.js --name puzzle-game
+
+# 设置开机自启
+pm2 startup
+pm2 save
+```
+
+**第七步：配置防火墙**
+
+在腾讯云控制台操作：
+1. 进入**云服务器** → 点击实例
+2. 找到**安全组** → **配置规则**
+3. 添加入站规则：
+   - 端口：`3000`
+   - 协议：`TCP`
+   - 来源：`0.0.0.0/0`
+
+同时配置系统防火墙：
+```bash
+# Ubuntu/Debian
+sudo ufw allow 3000
+
+# CentOS/RHEL
+sudo firewall-cmd --permanent --add-port=3000/tcp
+sudo firewall-cmd --reload
+```
+
+**常用 PM2 命令：**
+
+```bash
+pm2 status                    # 查看运行状态
+pm2 logs puzzle-game          # 查看日志
+pm2 restart puzzle-game       # 重启服务
+pm2 stop puzzle-game          # 停止服务
+pm2 delete puzzle-game        # 删除服务
+pm2 monit                     # 监控面板
+```
+
+**访问地址：**
+- 管理员端：`http://你的公网IP:3000/admin.html`
+- 玩家端：扫码或访问 `http://你的公网IP:3000/player.html`
+
+---
+
 #### 部署到 Railway（推荐，免费额度）
 
 Railway 是一个易用的云平台，提供免费额度，完美支持 WebSocket。
@@ -223,17 +333,21 @@ Heroku 不再提供免费额度，仅适合付费使用。
 
 ## 环境变量配置
 
-创建 `.env` 文件（可选）：
+创建 `.env` 文件：
+
 ```env
 PORT=3000
 NODE_ENV=production
+PUBLIC_URL=http://你的公网IP:3000
 ```
 
-修改 `server/server.js` 顶部添加：
-```javascript
-require('dotenv').config();
-const PORT = process.env.PORT || 3000;
-```
+**环境变量说明：**
+- `PORT`：服务端口，默认 3000
+- `NODE_ENV`：运行环境，production 为生产环境
+- `PUBLIC_URL`：**重要**，公网访问地址，用于生成二维码
+  - 腾讯云：`http://IP:端口` 或 `https://域名`
+  - Railway：`https://your-app.railway.app`
+  - 本地开发：可省略（自动使用 localhost）
 
 ## 防火墙配置
 
@@ -253,10 +367,11 @@ sudo firewall-cmd --reload
 
 1. 打开管理员端页面（默认：http://localhost:3000/admin.html）
 2. 点击上传区域或拖拽图片上传
-3. 等待玩家扫码加入
-4. 点击"开始游戏"按钮
-5. 查看实时排行榜
-6. 游戏结束后可点击"重置游戏"开始新一局
+3. **选择难度**：简单（3×3）/中等（4×4）/困难（5×5）
+4. 等待玩家扫码加入
+5. 点击"开始游戏"按钮
+6. 查看实时排行榜
+7. 游戏结束后可点击"重置游戏"开始新一局
 
 ### 玩家端操作流程
 
@@ -268,7 +383,11 @@ sudo firewall-cmd --reload
 
 ## 游戏规则
 
-- 拼图为 3x3 九宫格，每个小块被随机旋转（0°/90°/180°/270°）
+- 管理员可选择三种难度：
+  - **简单**：3×3 九宫格
+  - **中等**：4×4 十六宫格
+  - **困难**：5×5 二十五宫格
+- 每个小块被随机旋转（0°/90°/180°/270°）
 - 点击小块可将其顺时针旋转90度
 - 将所有小块都旋转回正确角度（0度）即可完成
 - 用时越少、步数越少，排名越高
@@ -301,6 +420,8 @@ chmod 755 uploads/
 3. 支持的图片格式：JPG、PNG、GIF
 4. 游戏过程中请保持网络连接
 5. 建议使用 Chrome 或 Safari 浏览器获得最佳体验
+6. **云部署重要**：必须在 `.env` 中配置 `PUBLIC_URL`，否则二维码地址不正确
+7. 每个玩家的拼图是独立随机打乱的，确保公平性
 
 ## 许可证
 
