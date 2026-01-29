@@ -463,6 +463,17 @@
                     startGame();
                     break;
 
+                case 'playerFinished':
+                    // 如果是自己完成了，显示胜利界面
+                    if (data.playerId === playerId) {
+                        onWin();
+                    }
+                    break;
+
+                case 'gameEnd':
+                    // 游戏全部结束
+                    break;
+
                 case 'gameReset':
                     resetGame();
                     break;
@@ -590,14 +601,9 @@
             }));
 
             renderPuzzle();
-
-            // 检查是否完成
-            if (checkWin()) {
-                onWin();
-            }
         }
 
-        // 检查是否获胜
+        // 检查是否获胜（保留用于本地检查，但不自动触发胜利）
         function checkWin() {
             // 所有格子都是0度即为完成
             return puzzle.every(function(val) {
